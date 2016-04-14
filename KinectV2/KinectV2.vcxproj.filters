@@ -22,4 +22,15 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\02_Depth\KinectV2-Depth-01\KinectV2\ForEnglish.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\02_Depth\KinectV2-Depth-01\KinectV2\ImgClass.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\02_Depth\KinectV2-Depth-01\KinectV2\ImgClass_private.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>

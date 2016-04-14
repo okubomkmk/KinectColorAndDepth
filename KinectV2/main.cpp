@@ -4,10 +4,8 @@
 
 #include <Kinect.h>
 #include <opencv2\opencv.hpp>
-
+#include "C:\Users\mkuser\Documents\K4W2-Book-master\K4W2-Book-master\C++(Native)\02_Depth\KinectV2-Depth-01\KinectV2\ForEnglish.h"
 #include <atlbase.h>
-
-# define GETFRAMENUMBER 5
 using namespace std;
 // 次のように使います
 // ERROR_CHECK( ::GetDefaultKinectSensor( &kinect ) );
@@ -36,6 +34,7 @@ private:
 
     // 表示部分
     std::vector<BYTE> colorBuffer;
+	std::vector<std::vector<BYTE>> colorFrameSave;
 
 	CComPtr<IDepthFrameReader> depthFrameReader = nullptr;
 
@@ -46,12 +45,25 @@ private:
 	int depthPointX;
 	int depthPointY;
 
+	int filenamecounter = 0;
+	string fileName;
+
+	bool screenshot = false;
+	bool recording = false;
+	int frameCounter = 0;
 
 	vector<UINT16> depthBuffer;
 	vector<UINT16> revercedBuffer;
 	vector<UINT16> PreviousFrame;
 	vector<vector<UINT16>> FrameBuffer;
 	const char* DepthWindowName = "Depth Image";
+	double fps = 30;
+
+	double dWidth = 1920;
+	double dHeight = 1080;
+
+
+	//CvVideoWriter* VideoWriter = cvCreateVideoWriter("avifile.avi", -1, fps, cvSize(dWidth, dHeight), 1);
 
 public:
 
@@ -94,7 +106,11 @@ public:
 
         // バッファーを作成する
         colorBuffer.resize( colorWidth * colorHeight * colorBytesPerPixel );
+		colorFrameSave.resize(GETFRAMENUMBER);
 
+		for (int i = 0; i < GETFRAMENUMBER; i++){
+			colorFrameSave[i].resize(colorWidth * colorHeight * colorBytesPerPixel);
+		}
 		// Depthリーダーを取得する
 		CComPtr<IDepthFrameSource> depthFrameSource;
 		ERROR_CHECK(kinect->get_DepthFrameSource(&depthFrameSource));
@@ -127,20 +143,58 @@ public:
 		{
 			FrameBuffer[i].resize(depthWidth * depthHeight);
 		}
-
+		
+		//マウス関連
+		cv::namedWindow(DepthWindowName);
+		cv::setMouseCallback(DepthWindowName, &KinectApp::mouseCallback, this);
 
     }
 
+	static void mouseCallback(int event, int x, int y, int flags, void* userdata)
+	{
+		// 引数に渡したthisポインタを経由してメンバ関数に渡す
+		auto pThis = (KinectApp*)userdata;
+		pThis->mouseCallback(event, x, y, flags);
+	}
+
+	// マウスイベントのコールバック(実処理)
+	void mouseCallback(int event, int x, int y, int flags)
+	{
+		if (event == CV_EVENT_LBUTTONDOWN) {
+			depthPointX = x;
+			depthPointY = y;
+		}
+	}
+
     void run()
     {
-        while ( 1 ) {
-            update();
-            draw();
+		while (1) {
+			update();
+			
+			//draw();
 
-            auto key = cv::waitKey( 10 );
-            if ( key == 'q' ){
-                break;
-            }
+			auto key = cv::waitKey(10);
+			if (key == 'q'){
+				break;
+			}
+			if (key == 's'){
+				screenshot = true;
+			}
+			if (key == 'r'){
+				recording = true;
+				cout << "recording\n";
+			}
+			if (screenshot){
+				cout << "save start\n";
+				string Filename = "V:\\EnglishPaperPresentation\\Mapper\\colorOriginal";
+				for (int i = 0; i < GETFRAMENUMBER; i++){
+					cv::imwrite(Filename + to_string(i) + ".bmp", colorFrameSave[i]);
+					cout << "frame num " << i << "\n";
+				}
+				cout << "save end \n";
+				screenshot = false;
+				frameCounter = 0;
+			}
         }
     }
 
@@ -152,7 +206,7 @@ private:
     void update()
     {
         updateColorFrame();
-		updateDepthFrame();
+		//updateDepthFrame();
     }
 
     // カラーフレームの更新
@@ -164,10 +218,22 @@ private:
         if ( FAILED( ret ) ){
             return;
         }
-        
+		if (!recording){
+			ERROR_CHECK(colorFrame->CopyConvertedFrameDataToArray(
+				colorBuffer.size(), &colorBuffer[0], colorFormat));
+		}
+
+		else{
+			ERROR_CHECK(colorFrame->CopyConvertedFrameDataToArray(
+				colorFrameSave[frameCounter].size(), &colorFrameSave[frameCounter][0], colorFormat));
+			frameCounter++;
+			if (frameCounter == GETFRAMENUMBER - 1){
+				recording = false;
+				cout << "record end\n";
+			}
+		}
         // 指定の形式でデータを取得する
-        ERROR_CHECK( colorFrame->CopyConvertedFrameDataToArray(
-                        colorBuffer.size(), &colorBuffer[0], colorFormat ) );
+
     }
 	void updateDepthFrame()
 	{
@@ -182,11 +248,17 @@ private:
 		ERROR_CHECK(depthFrame->CopyFrameDataToArray(
 			depthBuffer.size(), &depthBuffer[0]));
 
-		for (int i = 0; i < depthWidth* depthHeight; i++)
+		for (int i = 0; i < depthWidth * depthHeight; i++)
 		{
 			FrameBuffer[GETFRAMENUMBER - 1][i] = depthBuffer[i];
 		}
 
+	}
+	
+	void draw()
+	{
+		drawColorFrame();
+		drawDepthFrame();
 	}
 
 	void drawDepthFrame()
@@ -205,36 +277,36 @@ private:
 		// Depthデータのインデックスを取得して、その場所の距離を表示する
 		int index = (depthPointY * depthWidth) + depthPointX;
 		std::stringstream ss;
-		ss << depthBuffer[index] << "mm X=" << depthPointX << " Y= " << depthPointY;
+		ss << depthBuffer[index] << "mm X=" << depthPointX << " Y= " << depthPointY << " " <<to_string(filenamecounter);
 
 		cv::circle(depthImage, cv::Point(depthPointX, depthPointY), 3,
 			cv::Scalar(255, 255, 255), 2);
 		cv::putText(depthImage, ss.str(), cv::Point(depthPointX, depthPointY),
 			0, 0.5, cv::Scalar(255, 255, 255));
 
-		cv::imshow(DepthWindowName, depthImage);
 
+		//cv::imshow(DepthWindowName, depthImage);
 	}
     // データの表示処理
-    void draw()
-    {
-        drawColorFrame();
-		drawDepthFrame();
-    }
+
 
     // カラーデータの表示処理
     void drawColorFrame()
     {
-#if 0
-        // カラーデータを表示する
-        cv::Mat colorImage( colorHeight, colorWidth,  CV_8UC4, &colorBuffer[0] );
-        cv::imshow( "Color Image", colorImage );
-#else
+
         cv::Mat colorImage( colorHeight, colorWidth, CV_8UC4, &colorBuffer[0] );
         cv::Mat harfImage;
         cv::resize( colorImage, harfImage, cv::Size(), 0.5, 0.5 );
-        cv::imshow( "Harf Image", harfImage );
-#endif
+        //cv::imshow( "Harf Image", harfImage );
+		/*
+		if (filenamecounter < 30){
+			saveFile(harfImage,filenamecounter,"ColorData");
+			filenamecounter++;
+		}
+		*/
+
+
+
     }
 };
 
@@ -248,4 +320,6 @@ void main()
     catch ( std::exception& ex ){
         std::cout << ex.what() << std::endl;
     }
+
+
 }

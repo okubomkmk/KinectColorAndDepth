@@ -89,6 +89,11 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\02_Depth\KinectV2-Depth-01\KinectV2\ForEnglish.h" />
+    <ClInclude Include="..\..\..\02_Depth\KinectV2-Depth-01\KinectV2\ImgClass.h" />
+    <ClInclude Include="..\..\..\02_Depth\KinectV2-Depth-01\KinectV2\ImgClass_private.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\packages\OpenCV.2.4.10\build\native\OpenCV.targets" Condition="Exists('..\packages\OpenCV.2.4.10\build\native\OpenCV.targets')" />
