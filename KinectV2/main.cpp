@@ -1,5 +1,6 @@
 ﻿#include <iostream>
 #include <sstream>
+#include <fstream>
 #include <map>
 
 #include <Kinect.h>
@@ -31,7 +32,7 @@ private:
     unsigned int colorBytesPerPixel;
 
     ColorImageFormat colorFormat = ColorImageFormat::ColorImageFormat_Bgra;
-
+	POINT R1, R2;
     // 表示部分
     std::vector<BYTE> colorBuffer;
 	std::vector<std::vector<BYTE>> colorFrameSave;
@@ -46,22 +47,25 @@ private:
 	int depthPointY;
 
 	int filenamecounter = 0;
-	string fileName;
 
 	bool screenshot = false;
 	bool recording = false;
 	int frameCounter = 0;
-
+	string FilePass = "semi0512\\Data";
+	string Filename = "V:\\" + FilePass;
+	
 	vector<UINT16> depthBuffer;
 	vector<UINT16> revercedBuffer;
 	vector<UINT16> PreviousFrame;
 	vector<vector<UINT16>> FrameBuffer;
-	const char* DepthWindowName = "Depth Image";
+	const char* DepthWindowName = "Depth Image"; 
+	const char* ColorWindowName = "Color Image";
 	double fps = 30;
 
 	double dWidth = 1920;
 	double dHeight = 1080;
-
+	ofstream textwriter;
+	stringstream colorFrameText;
 
 	//CvVideoWriter* VideoWriter = cvCreateVideoWriter("avifile.avi", -1, fps, cvSize(dWidth, dHeight), 1);
 
@@ -136,6 +140,11 @@ public:
 		std::cout << "Depth最小値       : " << minDepthReliableDistance << endl;
 		cout << "Depth最大値       : " << maxDepthReliableDistance << endl;
 
+		// initialize point
+		R1.x = 100;
+		R1.y = 100;
+		R2.x = colorWidth / 2 - 1;
+		R2.y = colorHeight / 2 - 1;
 		// バッファーを作成する
 		depthBuffer.resize(depthWidth * depthHeight);
 		FrameBuffer.resize(GETFRAMENUMBER);
@@ -148,6 +157,8 @@ public:
 		cv::namedWindow(DepthWindowName);
 		cv::setMouseCallback(DepthWindowName, &KinectApp::mouseCallback, this);
 
+		cv::namedWindow(ColorWindowName);
+		cv::setMouseCallback(ColorWindowName, &KinectApp::mouseCallbackColor, this);
     }
 
 	static void mouseCallback(int event, int x, int y, int flags, void* userdata)
@@ -166,11 +177,30 @@ public:
 		}
 	}
 
+	static void mouseCallbackColor(int event, int x, int y, int flags, void* userdata)
+	{
+		// 引数に渡したthisポインタを経由してメンバ関数に渡す
+		auto pThis = (KinectApp*)userdata;
+		pThis->mouseCallbackColor(event, x, y, flags);
+	}
+
+	void mouseCallbackColor(int event, int x, int y, int flags)
+	{
+		if (event == CV_EVENT_LBUTTONDOWN) {
+			R1.x = x;
+			R1.y = y;
+		}
+
+		if (event == CV_EVENT_RBUTTONDOWN){
+			R2.x = x;
+			R2.y = y;
+		}
+	}
+
     void run()
     {
 		while (1) {
 			update();
-			
 			//draw();
 
 			auto key = cv::waitKey(10);
@@ -184,16 +214,21 @@ public:
 				recording = true;
 				cout << "recording\n";
 			}
+			if (!recording){
+				draw();
+			}
+			
 			if (screenshot){
 				cout << "save start\n";
-				string Filename = "V:\\EnglishPaperPresentation\\Mapper\\colorOriginal";
+				ofstream textwriter(Filename + "\\colorframedata.dat");
 				for (int i = 0; i < GETFRAMENUMBER; i++){
-					cv::imwrite(Filename + to_string(i) + ".bmp", colorFrameSave[i]);
+					cv::imwrite(Filename + "\\" + to_string(i) + ".bmp", colorFrameSave[i]);
 					cout << "frame num " << i << "\n";
 				}
 				cout << "save end \n";
 				screenshot = false;
 				frameCounter = 0;
+				textwriter << colorWidth << "\n" << colorHeight << "\n" << GETFRAMENUMBER << "\n"<< Filename << "\n" << endl;
 			}
         }
     }
@@ -206,7 +241,9 @@ private:
     void update()
     {
         updateColorFrame();
-		//updateDepthFrame();
+		if (!recording){
+			updateDepthFrame();
+		}
     }
 
     // カラーフレームの更新
@@ -285,7 +322,7 @@ private:
 			0, 0.5, cv::Scalar(255, 255, 255));
 
 
-		//cv::imshow(DepthWindowName, depthImage);
+		cv::imshow(DepthWindowName, depthImage);
 	}
     // データの表示処理
 
@@ -293,11 +330,16 @@ private:
     // カラーデータの表示処理
     void drawColorFrame()
     {
-
+		colorFrameText = getROIdata(R1, R2);
         cv::Mat colorImage( colorHeight, colorWidth, CV_8UC4, &colorBuffer[0] );
         cv::Mat harfImage;
         cv::resize( colorImage, harfImage, cv::Size(), 0.5, 0.5 );
-        //cv::imshow( "Harf Image", harfImage );
+
+		cv::rectangle(harfImage, cv::Point(R1.x, R1.y), cv::Point(R2.x, R2.y), cv::Scalar(0, 0, 255), 1, 8, 0);
+		cv::putText(harfImage, colorFrameText.str(), cv::Point(10, 10), 0, 0.5, cv::Scalar(0, 0, 255));
+
+		cv::imshow(ColorWindowName, harfImage);
+
 		/*
 		if (filenamecounter < 30){
 			saveFile(harfImage,filenamecounter,"ColorData");
@@ -320,6 +362,4 @@ void main()
     catch ( std::exception& ex ){
         std::cout << ex.what() << std::endl;
     }
-
-
 }
